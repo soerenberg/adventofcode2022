@@ -9,7 +9,7 @@ import Text.Parsec (char, digit, many1, parse)
 
 type Range = (Int, Int)
 
-range :: Parser (Int, Int)
+range :: Parser Range
 range = (,) <$> number <* char '-' <*> number
   where number = read <$> many1 digit
 
