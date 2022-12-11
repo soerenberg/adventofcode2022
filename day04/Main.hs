@@ -16,15 +16,21 @@ range = (,) <$> number <* char '-' <*> number
 line :: Parser (Range, Range)
 line = (,) <$> range <* char ',' <*> range <* char '\n'
 
-hasCover :: Range -> Range -> Bool
-hasCover x y = x `contains` y || y `contains` x
+covers :: (Range, Range) -> Bool
+covers (x, y) = x `contains` y || y `contains` x
   where contains (a, b) (c, d) = a >= c && b <= d
 
-countCovers :: [(Range, Range)] -> Int
-countCovers xs = let f = fromEnum . (uncurry hasCover) in sum $ map f xs
+overlaps :: (Range, Range) -> Bool
+overlaps (x, y) = x `overlapsAtTail` y || y `overlapsAtTail` x
+  where overlapsAtTail (a, b) (c, _) = a <= c && c <= b
+
+countWith :: ((Range, Range) -> Bool) -> [(Range, Range)] -> Int
+countWith f xs = sum $ map (fromEnum . f) xs
 
 main :: IO ()
 main = do input <- pack <$> readFile "data/day04.txt"
           let x = parse (many1 line) "" input
-          let partI = fromRight "error" $ show . countCovers <$> x
-          putStrLn $ "num covers (part I): " ++ partI
+          let partI = fromRight "error" $ show . countWith covers <$> x
+          let partII = fromRight "error" $ show . countWith overlaps <$> x
+          putStrLn $ "num covers (part I):       " ++ partI
+          putStrLn $ "num overlappings (part I): " ++ partII
