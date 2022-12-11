@@ -34,6 +34,7 @@ library
   build-depends:
       base >=4.7 && <5
     , containers
+    , parsec
     , text
   default-language: Haskell2010
 
@@ -48,6 +49,7 @@ executable day01
       adventofcode
     , base >=4.7 && <5
     , containers
+    , parsec
     , text
   default-language: Haskell2010
 
@@ -62,6 +64,7 @@ executable day02
       adventofcode
     , base >=4.7 && <5
     , containers
+    , parsec
     , text
   default-language: Haskell2010
 
@@ -76,6 +79,22 @@ executable day03
       adventofcode
     , base >=4.7 && <5
     , containers
+    , parsec
+    , text
+  default-language: Haskell2010
+
+executable day04
+  main-is: Main.hs
+  other-modules:
+      Paths_adventofcode
+  hs-source-dirs:
+      day04
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      adventofcode
+    , base >=4.7 && <5
+    , containers
+    , parsec
     , text
   default-language: Haskell2010
 
@@ -91,5 +110,6 @@ test-suite adventofcode-test
       adventofcode
     , base >=4.7 && <5
     , containers
+    , parsec
     , text
   default-language: Haskell2010
