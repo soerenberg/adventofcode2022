@@ -24,6 +24,8 @@ dependencies:
 - text
 - containers
 - parsec
+- mtl
+- microlens-platform
 
 ghc-options:
 - -Wall
@@ -64,6 +66,9 @@ executables:
   day05:
     <<: *exe-defaults
     source-dirs:         day05
+  day12:
+    <<: *exe-defaults
+    source-dirs:         day12
 
 tests:
   adventofcode-test:
