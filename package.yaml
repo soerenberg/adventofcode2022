@@ -61,6 +61,9 @@ executables:
   day04:
     <<: *exe-defaults
     source-dirs:         day04
+  day05:
+    <<: *exe-defaults
+    source-dirs:         day05
 
 tests:
   adventofcode-test:
