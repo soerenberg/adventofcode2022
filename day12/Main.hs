@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main (main) where
 
-import Control.Monad.State.Lazy
+import Control.Monad.State.Lazy (State, execState)
 import Data.Char (ord)
 import qualified Data.List as L
 import qualified Data.Map as M
@@ -33,30 +33,6 @@ nodeAdjList p@(x, y) m = [c | (c, e) <- neighElev, e - elev <= 1]
         ds = [(-1, 0), (1, 0), (0, -1), (0, 1)]
         elev = fromJust $ M.lookup p m
 
--- | State monad for Dijkstra's algorithm
-initState :: Graph -> Coord -> Coord -> DState
-initState g s e = DS { _graph         = g
-                     , _start         = s
-                     , _end           = e
-                     , _lengths       = lengths
-                     , _unvisited     = S.fromList $ M.keys g
-                     , _current       = s
-                     , _currentWeight = Inf
-                     }
-  where lengths = M.insert s (N 0) $ M.map (const Inf) g
-
-buildState :: String -> DState
-buildState xs = initState g s e
-  where g = toGraph . (M.map toElevation) $ m
-        s = findCharPos 'S' m
-        e = findCharPos 'E' m
-        m =  toCharMap xs
-
-toElevation :: Char -> Int
-toElevation 'S' = toElevation 'a'
-toElevation 'E' = toElevation 'z'
-toElevation x = ord x - 96
-
 -- | Extended integers
 data Length = N Int | Inf deriving (Eq, Show)
 instance Ord Length where
@@ -65,17 +41,46 @@ instance Ord Length where
   compare Inf _ = GT
   compare (N a) (N b) = compare a b
 
--- | Dijkstra's algorithm
-data DState = DS { _graph   :: Graph
-                 , _start   :: Coord
-                 , _end     :: Coord
-                 , _lengths   :: M.Map Coord Length
-                 , _unvisited  :: S.Set Coord
-                 , _current :: Coord
+-- | State monad for Dijkstra's algorithm
+data DState = DS { _graph         :: Graph
+                 , _elevations    :: M.Map Coord Int
+                 , _start         :: Coord
+                 , _end           :: Coord
+                 , _lengths       :: M.Map Coord Length
+                 , _unvisited     :: S.Set Coord
+                 , _current       :: Coord
                  , _currentWeight :: Length
                  } deriving (Eq, Show)
 makeLenses ''DState
 
+initState :: Graph -> Coord -> Coord -> Elevations -> DState
+initState g s e es = DS { _graph         = g
+                        , _elevations    = es
+                        , _start         = s
+                        , _end           = e
+                        , _lengths       = ls
+                        , _unvisited     = S.fromList $ M.keys g
+                        , _current       = s
+                        , _currentWeight = Inf
+                        }
+  where ls = M.insert s (N 0) $ M.map (const Inf) g
+
+buildState :: Char -> String -> DState
+buildState t xs = initState g s e es
+  where g = toGraph es
+        es = M.map toElevation m
+        s = findCharPos t m
+        e = findCharPos 'E' m
+        m =  toCharMap xs
+
+type Elevations = M.Map Coord Int
+
+toElevation :: Char -> Int
+toElevation 'S' = toElevation 'a'
+toElevation 'E' = toElevation 'z'
+toElevation x = ord x - 96
+
+-- | Dijkstra's algorithm
 dijkstra :: State DState ()
 dijkstra = do isDone <- S.null <$> use unvisited
               case isDone of
@@ -121,8 +126,27 @@ getLengthToEnd s = ls
   where e = _end s
         ls = M.findWithDefault Inf e $ _lengths s
 
+-- | Extract length to closest 'a'
+shortestLengthToA :: DState -> Length
+shortestLengthToA s = minimum ls
+  where ls = map (flip (M.findWithDefault Inf) $ _lengths s) as
+        as = M.keys $ M.filter (==1) $ _elevations s
+
+-- | Invert graph for part II
+invertEdges :: Graph -> Graph
+invertEdges = M.foldrWithKey consumeAdj M.empty
+  where consumeAdj k xs mb = foldr (\x mm -> M.insertWith (++) x [k] mm) mb xs
+
+invertEdges_ :: State DState ()
+invertEdges_ = do graph %= invertEdges
+
 main :: IO ()
 main = do input <- readFile "data/day12.txt"
-          let st = buildState input
+          let st = buildState 'S' input
           let result = getLengthToEnd $ execState dijkstra st
-          putStrLn $ "length S->E: " ++ show result
+          putStrLn $ "length S->E (part I): " ++ show result
+          -- for part II, use E as start and invert graph edges
+          let st' = buildState 'E' input
+          let ft = execState (invertEdges_ >> dijkstra) st'
+          let result' = shortestLengthToA ft
+          putStrLn $ "closest length to 'a' (part II): " ++ show result'
