@@ -8,19 +8,19 @@ import Lens.Micro.Platform ((%=), makeLenses, use)
 data St = St {_counter :: Int, _letters :: String} deriving Show
 makeLenses ''St
 
-firstMarker :: State St Int
-firstMarker = do xs <- take 4 <$> use letters
-                 letters %= tail
-                 c <- use counter
-                 case (<4) . S.size . S.fromList $ xs of
-                   False -> return c
-                   _ -> do counter %= (+1)
-                           firstMarker
+firstMarker :: Int -> State St Int
+firstMarker n = do xs <- take n <$> use letters
+                   letters %= tail
+                   c <- use counter
+                   case (<n) . S.size . S.fromList $ xs of
+                     False -> return c
+                     _ -> do counter %= (+1)
+                             firstMarker n
 
-buildState :: String -> St
-buildState = St 4
+getFirstMarker :: Int -> String -> Int
+getFirstMarker m = (evalState $ firstMarker m) . (St m)
 
 main :: IO ()
 main = do input <- readFile "data/day06.txt"
-          let x = (evalState firstMarker) . buildState $ input
-          putStrLn $ "part I: " ++ show x
+          putStrLn $ "part  I: " ++ (show $ getFirstMarker 4 input)
+          putStrLn $ "part II: " ++ (show $ getFirstMarker 14 input)
