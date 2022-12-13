@@ -27,19 +27,15 @@ packet = (Packet <$> list) <|> num
         num = N . read <$> many1 digit
         comma = char ','
 
--- Get 0-based indices of right orderings
-ltIndices :: [Ordering] -> [Int]
-ltIndices = L.findIndices (==LT)
-
 main :: IO ()
 main = do
   -- part I
   input <- pack <$> readFile "data/day13.txt"
   let pairs = fromRight [] $ parse file "" input
-  let indSum = sum . (map (+1)) . ltIndices. (map (uncurry compare)) $ pairs
-  putStrLn $ "Sum of indices (part I): " ++ show indSum
+  let indices = (L.findIndices (==LT)). (map $ uncurry compare) $ pairs
+  putStrLn $ "Sum of indices (part I): " ++ show (sum . (map (+1)) $ indices)
   -- part II
   let ds = [Packet [Packet [N n]] | n <- [2, 6]]
-  let ls = L.sort $ ds ++ (pairs >>= (\(x, y) -> [x, y]))
-  let p = product . (map (+1)) . (L.findIndices (`L.elem` ds)) $ ls
+  let sorted = L.sort $ ds ++ (pairs >>= (\(x, y) -> [x, y]))
+  let p = product . (map (+1)) . (L.findIndices (`L.elem` ds)) $ sorted
   putStrLn $ "Product of divider indices (part II): " ++ show p
