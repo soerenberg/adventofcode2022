@@ -68,3 +68,7 @@ main = do input <- pack <$> readFile "data/day07.txt"
           let sizes = fromRight [] $ folderSizes <$> parse parseTree "" input
           let r = sum . (filter (<=100000)) $ sizes
           putStrLn $ "part  I: " ++ show r
+          -- part II
+          let needed = 30000000 - 70000000 + maximum sizes
+          let r' = minimum . (filter (>=needed)) $ sizes
+          putStrLn $ "part II: " ++ show r'
