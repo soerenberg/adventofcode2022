@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 module Main (main) where
 
 import Data.Either (fromRight)
@@ -12,9 +11,9 @@ data Packet = N Int | Packet [Packet] deriving (Eq, Show)
 
 instance Ord Packet where
   compare (Packet xs) (Packet ys) = compare xs ys
-  compare l@(N _) r@(Packet _) = compare (Packet [l]) r
-  compare l@(Packet _) r@(N _)= compare l (Packet [r])
-  compare (N l) (N r)= compare l r
+  compare l@(N _) r@(Packet _)    = compare (Packet [l]) r
+  compare l@(Packet _) r@(N _)    = compare l (Packet [r])
+  compare (N l) (N r)             = compare l r
 
 -- | Parsing
 file :: Parser [(Packet, Packet)]
@@ -34,7 +33,13 @@ ltIndices = L.findIndices (==LT)
 
 main :: IO ()
 main = do
+  -- part I
   input <- pack <$> readFile "data/day13.txt"
   let pairs = fromRight [] $ parse file "" input
   let indSum = sum . (map (+1)) . ltIndices. (map (uncurry compare)) $ pairs
   putStrLn $ "Sum of indices (part I): " ++ show indSum
+  -- part II
+  let ds = [Packet [Packet [N n]] | n <- [2, 6]]
+  let ls = L.sort $ ds ++ (pairs >>= (\(x, y) -> [x, y]))
+  let p = product . (map (+1)) . (L.findIndices (`L.elem` ds)) $ ls
+  putStrLn $ "Product of divider indices (part II): " ++ show p
