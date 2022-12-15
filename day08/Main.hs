@@ -34,10 +34,6 @@ countVisibles = do w <- use width
                    [(x, h) | x <- [1..w]] `forM_` (epoch up)
                    vs <- use visibles
                    return $ S.size vs
-  where right = (\(x, y) -> (x + 1, y))
-        left  = (\(x, y) -> (x - 1, y))
-        up    = (\(x, y) -> (x, y - 1))
-        down  = (\(x, y) -> (x, y + 1))
 
 epoch :: (Vec2 -> Vec2) -> Vec2 -> State IterState ()
 epoch f p = do es <- use elevs
@@ -51,6 +47,41 @@ epoch f p = do es <- use elevs
                                else epoch f (f p)
                  _ -> maxElev .= -1
 
+scenicScore :: Vec2 -> State IterState Int
+scenicScore p = do elevs <- use elevs
+                   let pElev = M.findWithDefault (-1) p elevs
+                   maxElev .= pElev
+                   a <- reset >> epoch' right (right p)
+                   b <- reset >> epoch' left (left p)
+                   c <- reset >> epoch' down (down p)
+                   d <- reset >> epoch' up (up p)
+                   return $ a * b * c * d
+  where reset = do visibles .= S.empty
+
+epoch' :: (Vec2 -> Vec2) -> Vec2 -> State IterState Int
+epoch' f p = do es <- use elevs
+                m <- use maxElev
+                let curElev = M.lookup p es
+                case curElev of
+                  (Just e) -> do visibles %= S.insert p
+                                 if e < m then epoch' f (f p) else abort
+                  _ -> abort
+  where abort = S.size <$> (use visibles)
+
+findBestScenicScore :: IterState -> Int
+findBestScenicScore s = maximum . (map toScore) $ M.keys es
+  where toScore = \x -> evalState (scenicScore x) s
+        es = _elevs s
+
+right :: Vec2 -> Vec2
+right = (\(x, y) -> (x + 1, y))
+left :: Vec2 -> Vec2
+left  = (\(x, y) -> (x - 1, y))
+up :: Vec2 -> Vec2
+up    = (\(x, y) -> (x, y - 1))
+down :: Vec2 -> Vec2
+down  = (\(x, y) -> (x, y + 1))
+
 initState :: ElevationMap -> IterState
 initState m = IterState { _visibles = S.empty
                         , _maxElev  = -1
@@ -62,5 +93,9 @@ initState m = IterState { _visibles = S.empty
 main :: IO ()
 main = do input <- readFile "data/day08.txt"
           let grid = M.fromList $ buildGridWith C.digitToInt $ lines input
-          let counts = evalState countVisibles $ initState grid
+          let s = initState grid
+          let counts = evalState countVisibles s
           putStrLn $ "count (part I): " ++ (show $ counts)
+
+          let sc = findBestScenicScore s
+          putStrLn $ "score: " ++ (show sc)
