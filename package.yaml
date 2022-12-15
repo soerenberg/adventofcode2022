@@ -90,6 +90,9 @@ executables:
   day14:
     <<: *exe-defaults
     source-dirs:         day14
+  day15:
+    <<: *exe-defaults
+    source-dirs:         day15
   day18:
     <<: *exe-defaults
     source-dirs:         day18
