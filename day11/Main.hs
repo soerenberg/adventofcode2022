@@ -22,18 +22,23 @@ data IterState = IterState { _roundsLeft    :: Int
                            , _monkeys       :: M.Map Int Monkey
                            , _currentMonkey :: Int
                            , _numMonkeys    :: Int
+                           , _worryMod      :: Int -> Int
+                           , _maxLvl        :: Int
                            }
 makeLenses ''IterState
 
-initState :: [(Monkey, [Int])] -> IterState
-initState xs = IterState { _roundsLeft    = 20
-                         , _inspectCounts = M.fromList $ zip [0..] $ replicate n 0
-                         , _items         = M.fromList $ zip [0..] zs
-                         , _monkeys       = M.fromList $ zip [0..] ys
-                         , _currentMonkey = 0
-                         , _numMonkeys    = n
-                         }
-  where (ys, zs) = unzip xs
+initState :: Bool -> [(Monkey, [Int], Int)] -> IterState
+initState partII xs =
+  IterState { _roundsLeft    = if partII then 10000 else 20
+            , _inspectCounts = M.fromList $ zip [0..] $ replicate n 0
+            , _items         = M.fromList $ zip [0..] zs
+            , _monkeys       = M.fromList $ zip [0..] ys
+            , _currentMonkey = 0
+            , _numMonkeys    = n
+            , _worryMod      = if partII then id else flip div 3
+            , _maxLvl        = product vs
+            }
+  where (ys, zs, vs) = unzip3 xs
         n = length ys
 
 play :: State IterState ()
@@ -46,11 +51,12 @@ play = do isDone <- (<=0) <$> use roundsLeft
                     play
 
 playMonkey :: Int ->  State IterState ()
-playMonkey c = do --c <- use currentMonkey
-                  xs <- M.findWithDefault [] c <$> use items
+playMonkey c = do xs <- M.findWithDefault [] c <$> use items
                   inspectCounts %= M.insertWith (+) c (length xs)
                   m  <- fromJust .  M.lookup c <$> use monkeys
-                  let ys = map ((flip div 3) . (op m)) xs
+                  f <- use worryMod
+                  ml <- use maxLvl
+                  let ys = map ((`mod` ml) . f . (op m)) xs
                   let ds = map (to m) ys
                   (uncurry sendTo) `mapM_` zip ys ds
                   items %= M.insert c []
@@ -58,14 +64,14 @@ playMonkey c = do --c <- use currentMonkey
 sendTo :: Int -> Int -> State IterState ()
 sendTo i m = items %= M.insertWith (flip (++)) m [i]
 
-monkey :: Parser (Monkey, [Int])
+monkey :: Parser (Monkey, [Int], Int)
 monkey = do _ <- noDigit >> int >> noDigit >> spaces >> noDigit
             xs <- int `sepBy` (string ", ") <* spaces
             f <- noDigit >> operation
             x <- noDigit >> int <* spaces
             a <- noDigit >> int <* spaces
             b <- noDigit >> int <* spaces
-            return $ (Monkey f (\n -> if n `mod` x == 0 then a else b), xs)
+            return $ (Monkey f (\n -> if n `mod` x == 0 then a else b), xs, x)
 
 spaces :: Parser String
 spaces = many $ oneOf " \n"
@@ -82,13 +88,16 @@ operation = square <|> mult <|> add
 int :: Parser Int
 int = read <$> many1 digit
 
+getTwoMaxProd :: IterState -> Int
+getTwoMaxProd =  product . (take 2) . sortDesc . M.elems . _inspectCounts
+  where sortDesc = L.sortBy (flip compare)
 
 main :: IO ()
 main = do
   input <- pack <$> readFile "data/day11.txt"
   let ms = fromRight [] $ parse (many monkey) "" input
-  let st = initState ms
-  let fs = execState play st
-  let r = product . (take 2) . (L.sortBy (flip compare)) . M.elems . _inspectCounts $ fs
-  putStrLn $ (show r)
+  let fs = execState play $ initState False ms
+  putStrLn $ show $ getTwoMaxProd fs
 
+  let fs' = execState play $ initState True ms
+  putStrLn $ show $ getTwoMaxProd fs'
