@@ -15,8 +15,8 @@ moveRightAt xs i n = [x] ++  bs ++ as
         (as, bs) = L.splitAt n  $ tail zs ++ ys
         x = head zs
 
-moves :: [Vec2] -> [Vec2]
-moves l = foldl (move (length l)) l l
+moves :: Int -> [Vec2] ->[Vec2]
+moves r l = foldl (move (length l)) l (concat $ replicate r l)
 
 getAt :: [a] -> Int -> Int -> a
 getAt xs l i = xs !! (i `mod` l)
@@ -30,5 +30,9 @@ main :: IO ()
 main = do
   input <- readFile "data/day20.txt"
   let xs = map read $ lines input
-  let r = coordSum (moves $ zip xs [0..]) (length xs)
+  let r = coordSum (moves 1 $ zip xs [0..]) (length xs)
   putStrLn $ "part I: " ++ (show r)
+
+  let ys = map (*811589153) xs
+  let r' = coordSum (moves 10 $ zip ys [0..]) (length ys)
+  putStrLn $ "part I: " ++ (show r')
