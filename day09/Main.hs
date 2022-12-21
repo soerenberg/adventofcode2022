@@ -1,7 +1,8 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Main (main) where
 
-import Control.Monad.State.Lazy (State, evalState, execState)
+import Control.Monad (foldM)
+import Control.Monad.State.Lazy (State, evalState)
 import Data.Either (fromRight)
 import qualified Data.Set as S
 import Data.Text (pack)
@@ -11,40 +12,39 @@ import Text.Parsec (char, digit, many, many1, oneOf, parse)
 
 type Vec2 = (Int, Int)
 
-data IterState = IterState { _tpos      :: Vec2
+data IterState = IterState { _tpos      :: [Vec2]
                            , _hpos      :: Vec2
                            , _visited   :: S.Set Vec2
                            , _motions   :: [Vec2 -> [Vec2]]
-                           , _stack     :: [Vec2]
                            }
 makeLenses ''IterState
 
-initState :: [(Vec2 -> [Vec2])] -> IterState
-initState xs = IterState { _tpos     = (0, 0)
-                         , _hpos     = (0, 0)
-                         , _visited  = S.empty
-                         , _motions  = xs
-                         , _stack    = []
-                         }
+initState :: Bool -> [(Vec2 -> [Vec2])] -> IterState
+initState partII xs =
+  IterState { _tpos     = replicate (if partII then 9 else 1) (0, 0)
+            , _hpos     = (0, 0)
+            , _visited  = S.empty
+            , _motions  = xs
+            }
 
 simulate :: State IterState Int
-simulate = do t <- use tpos
-              stack %= (t:)
-              isDone <- null <$> use motions
+simulate = do isDone <- null <$> use motions
               if isDone
                 then S.size <$> use visited
                 else do f <- head <$> use motions
                         motions %= tail
                         hs <- f <$> use hpos
                         hpos .= last hs
-                        mapM_ follow hs
+                        t <- use tpos
+                        newts <- foldM follow t hs
+                        tpos .= newts
                         simulate
 
-follow :: Vec2 -> State IterState ()
-follow h = do tOld <- use tpos
-              let t = calcTail h tOld
-              visited %= S.insert t
-              tpos .= t
+follow :: [Vec2] -> Vec2 -> State IterState [Vec2]
+follow [] _ = return []
+follow (t:ts) h = do let new_t = calcTail h t
+                     visited %= if null ts then S.insert new_t else id
+                     (new_t:) <$> follow ts new_t
 
 motion :: Parser (Vec2 -> [Vec2])
 motion = toMotion <$> dir <*> units
@@ -67,10 +67,12 @@ calcTail h@(hx,hy) t@(tx,ty)
   | abs (hx-tx) == 1 && abs (hy-ty) == 1 = (tx, ty)
   | abs (hx-tx) > 1  && abs (hy-ty) == 1 = (hx - signum (hx-tx), hy)
   | abs (hx-tx) == 1 && abs (hy-ty) > 1  = (hx, hy - signum (hy-ty))
+  | abs (hx-tx) == abs (hy-ty) = (hx - signum (hx-tx), hy - signum (hy-ty))
 
 main :: IO ()
 main = do input <- pack <$> readFile "data/day09.txt"
-          let xs = fromRight [] $ parse (many motion) "" input
-
-          let fs = evalState simulate (initState xs)
-          putStrLn $ "part I: " ++ show fs
+          let ms = fromRight [] $ parse (many motion) "" input
+          let r = evalState simulate (initState False ms)
+          putStrLn $ "part I: " ++ show r
+          let r' = evalState simulate (initState True ms)
+          putStrLn $ "part II: " ++ show r'
