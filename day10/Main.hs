@@ -1,11 +1,8 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Main (main) where
 
-import Control.Monad.State.Lazy (State, evalState)
+import Control.Monad.State.Lazy (State, runState)
 import Data.Either (fromRight)
-import qualified Data.List as L
-import qualified Data.Map as M
-import Data.Maybe (fromJust)
 import Data.Text (pack)
 import Lens.Micro.Platform ((%=), (.=), makeLenses, use)
 import Text.Parsec.Text (Parser)
@@ -22,48 +19,65 @@ cmd = add <|> noop
         sint = read <$> ((:) <$> (option ' ' (char '-')) <*> (many1 digit))
 
 data IterState = S { _epoch        :: Int
-                   , _addExec      :: Int
+                   , _inProcess    :: Bool
                    , _summand      :: Int
                    , _val          :: Int
                    , _signals      :: [Int]
+                   , _crt          :: String
                    , _cmds         :: [Cmd]
                    } deriving Show
 makeLenses ''IterState
 
 initState :: [Cmd] -> IterState
-initState xs = S 0 0 0 1 [] xs
+initState xs = S 0 False 0 1 [] (replicate 240 '.') xs
 
-play :: State IterState Int
-play =
-  do isDone <- null <$> use cmds
-     if isDone
-       then sum <$> use signals
-       else do epoch %= (+1)
-               isSignal <- (\x -> (x-20) `mod` 40 == 0 && x <= 220) <$> use epoch
-               v <- use val
-               e <- use epoch
-               if isSignal then signals %= (e*v:) else return ()
-               inProc <- use addExec
-               case inProc of
-                 2 -> do addExec %= subtract 1
-                         play
-                 1 -> do addExec %= subtract 1
-                         s <- use summand
-                         val %= ((+) s)
-                         play
-                 _ -> do c <- head <$> use cmds
-                         case c of
-                           Noop -> do cmds %= tail
-                                      play
-                           (Add n) -> do addExec .= 1
-                                         cmds %= tail
-                                         summand .= n
-                                         play
+iter :: State IterState Int
+iter = do isDone <- null <$> use cmds
+          if isDone
+            then sum <$> use signals
+            else iter'
+
+iter' :: State IterState Int
+iter' =  do epoch %= (+1)
+            isSignal <- (\x -> (x-20) `mod` 40 == 0 && x <= 220) <$> use epoch
+            (e, v) <- (,) <$> use epoch <*> use val
+            drawPixel
+            if isSignal then signals %= (e*v:) else return ()
+            inProc <- use inProcess
+            if inProc
+              then finishAdd
+              else use cmds >>= (startNextCmd . head)
+            iter
+
+startNextCmd :: Cmd -> State IterState ()
+startNextCmd Noop = cmds %= tail
+startNextCmd (Add n) = do inProcess .= True
+                          cmds %= tail
+                          summand .= n
+
+finishAdd :: State IterState ()
+finishAdd = do inProcess .= False
+               s <- use summand
+               val %= ((+) s)
+
+drawPixel :: State IterState ()
+drawPixel = do --e <- use epoch
+               --v <- use val
+               (e, v) <- (,) <$> use epoch <*> use val
+               let e' = e - 40 * (div (e-1) 40)
+               if v <= e' && e' <= v + 2
+                 then crt %= (\(l,r) -> l ++ ('#':tail r)) . (splitAt (e-1))
+                 else return ()
+
+drawCrt :: String -> IO ()
+drawCrt [] = putStrLn ""
+drawCrt xs = putStrLn l >> drawCrt r
+  where (l, r) = splitAt 40 xs
 
 main :: IO ()
 main = do
   input <- pack <$> readFile "data/day10.txt"
   let cs = fromRight [] $ parse (many cmd) "" input
-
-  let r = evalState play (initState cs)
+  let (r, fs) = runState iter (initState cs)
   putStrLn $ "part I: " ++ show r
+  drawCrt $ _crt fs
