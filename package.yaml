@@ -111,6 +111,12 @@ executables:
   day22:
     <<: *exe-defaults
     source-dirs:         day22
+  day23:
+    <<: *exe-defaults
+    source-dirs:         day23
+  day24:
+    <<: *exe-defaults
+    source-dirs:         day24
 
 tests:
   adventofcode-test:
