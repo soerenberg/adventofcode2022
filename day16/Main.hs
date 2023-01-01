@@ -126,39 +126,46 @@ graphFromRecords xs = do let ns = map (\(x, _, _) -> x) xs
 
 findOptimalFromGraph :: (WGraph Node Int)
                      -> (M.Map Node Int)
+                     -> Bool
                      -> S.Set Node
                      -> Int
                      -> Node
                      -> Int
-findOptimalFromGraph g vs unvisits minLeft cn
+findOptimalFromGraph g vs elephant unvisits minLeft cn
   | minLeft <= 0  = 0
   | null unvisits = 0
-  | otherwise = maximum $ S.map (findOptimalFromGraph' g vs unvisits minLeft cn) unvisits
+  | otherwise = maximum $ S.map (findOptimalFromGraph' g vs elephant unvisits minLeft cn) unvisits
 
 findOptimalFromGraph' :: (WGraph Node Int)
                       -> (M.Map Node Int)
+                      -> Bool
                       -> S.Set Node
                       -> Int
                       -> Node
                       -> Node
                       -> Int
-findOptimalFromGraph' g vs unvisits minLeft od nd = val + rec
+findOptimalFromGraph' g vs elephant unvisits minLeft od nd = max (val + rec) (val + rec2)
   where val = if newTime > 0 then newTime * (fromJust $ M.lookup nd vs) else 0
-        rec = findOptimalFromGraph g vs (S.delete nd unvisits) newTime nd
+        rec = findOptimalFromGraph g vs elephant (S.delete nd unvisits) newTime nd
+        rec2 = if elephant then 0 else findOptimalFromGraph g vs True (S.delete nd unvisits) 26 "AA"
         moveTime = fromJust . (M.lookup (od, nd)) . weights $ g
         newTime = minLeft - moveTime - 1
 
-ttt :: [(Node, Int, [Node])] -> Int
-ttt xs = findOptimalFromGraph g vs (S.fromList relNodes') 30 "AA"
+findOptimal :: [(Node, Int, [Node])] -> Bool -> Int
+findOptimal xs isPartI =
+    findOptimalFromGraph g vs isPartI (S.fromList relNodes') m "AA"
   where g = rawGraph `shrinkTo` relNodes
         relNodes = ("AA"):(relNodes')
         relNodes' = map (\(x,_,_) -> x) $ filter (\(_,y,_) -> y > 0) xs
         rawGraph = graphFromRecords xs
         vs = M.fromList $ map (\(x,y,_) -> (x,y)) xs
+        m = if isPartI then 30 else 26
 
 main :: IO ()
 main = do
   input <- pack <$> readFile "data/day16.txt"
 
   let recs = fromRight [] $ parse (many1 line) "" input
-  putStrLn $ "part  I: " ++ (show $ ttt recs)
+  putStrLn $ "part  I: " ++ (show $ findOptimal recs True)
+
+  putStrLn $ "part II: " ++ (show $ findOptimal recs False)
